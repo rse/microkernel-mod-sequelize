@@ -18,9 +18,9 @@
     "homepage": "https://github.com/rse/microkernel-mod-sequelize",
     "bugs":     "https://github.com/rse/microkernel-mod-sequelize/issues",
     "dependencies": {
-        "sequelize":              "~3.23.2",
+        "sequelize":              "~3.23.6",
         "co":                     "~4.6.0",
-        "sprintfjs":              "~1.2.2"
+        "sprintfjs":              "~1.2.3"
     },
     "peerDependencies": {
         "microkernel":            "*",
