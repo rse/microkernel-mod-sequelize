@@ -71,10 +71,7 @@ export default class Module {
         return co(function * () {
             /*  configure the database connection  */
             let opts = kernel.rs("options:options")
-            let db = kernel.rs("db", new Sequelize(opts.db_database, opts.db_username, opts.db_password, {
-                dialect: opts.db_dialect,
-                host:    opts.db_host,
-                port:    opts.db_port,
+            let options = {
                 pool:    { min: 1, max: 8, idle: 10 * 1000 },
                 define: {
                     freezeTableName: true,
@@ -84,12 +81,29 @@ export default class Module {
                     if (!msg.match(/FROM\s+pg_class/))
                         kernel.sv("log", "sequelize", "debug", "DB: " + msg)
                 }
-            }))
+            }
+            options.dialect = opts.db_dialect
+            if (opts.db_dialect === "sqlite") {
+                opts.db_username = ""
+                opts.db_password = ""
+                options.host     = ""
+                options.port     = ""
+                options.storage  = opts.db_database
+            }
+            else {
+                options.host = opts.db_host
+                options.port = opts.db_port
+            }
+            let db = kernel.rs("db", new Sequelize(opts.db_database, opts.db_username, opts.db_password, options))
 
             /*  open connection to database system  */
-            let url = sprintf("%s://%s@%s:%d/%s",
-                opts.db_dialect, opts.db_username,
-                opts.db_host, opts.db_port, opts.db_database)
+            let url
+            if (opts.db_dialect === "sqlite")
+                url = sprintf("%s://%s",
+                    opts.db_dialect, opts.db_database)
+            else
+                url = sprintf("%s://%s@%s:%d/%s",
+                    opts.db_dialect, opts.db_username, opts.db_host, opts.db_port, opts.db_database)
             yield (new Promise((resolve, reject) => {
                 db.authenticate().then(() => {
                     kernel.sv("log", "sequelize", "info", sprintf("opened database connection to %s", url))
