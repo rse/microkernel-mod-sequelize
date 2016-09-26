@@ -23,6 +23,7 @@
 */
 
 /*  external requirements  */
+import Promise   from "bluebird"
 import co        from "co"
 import sprintf   from "sprintfjs"
 import Sequelize from "sequelize"
