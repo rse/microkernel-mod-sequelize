@@ -68,7 +68,7 @@ export default class Module {
                 help: "Database Schema Dropping & Auto-Recreation." })
         })
     }
-    start (kernel) {
+    prepare (kernel) {
         return co(function * () {
             /*  configure the database connection  */
             let opts = kernel.rs("options:options")
@@ -138,7 +138,7 @@ export default class Module {
              }))
         }.bind(this))
     }
-    stop (kernel) {
+    release (kernel) {
         /*  gracefully close connection on application shutdown  */
         kernel.sv("log", "sequelize", "info", "closing database connection")
         let db = kernel.rs("db")
