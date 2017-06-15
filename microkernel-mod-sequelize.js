@@ -135,7 +135,7 @@ export default class Module {
                 }
                 else
                     resolve()
-             }))
+            }))
         }.bind(this))
     }
     release (kernel) {
