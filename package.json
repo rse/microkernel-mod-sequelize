@@ -21,7 +21,7 @@
         "bluebird":                 "~3.5.0",
         "sequelize":                "~4.1.0",
         "co":                       "~4.6.0",
-        "sprintfjs":                "~1.2.5"
+        "sprintfjs":                "~1.2.6"
     },
     "devDependencies": {
         "babel-cli":                "~6.24.1",
