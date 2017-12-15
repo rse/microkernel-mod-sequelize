@@ -73,7 +73,12 @@ export default class Module {
             /*  configure the database connection  */
             let opts = kernel.rs("options:options")
             let options = {
-                pool:    { min: 1, max: 8, idle: 10 * 1000 },
+                pool: {
+                    min:  1,
+                    max:  8,
+                    idle: 10 * 1000
+                },
+                operatorsAliases: false,
                 define: {
                     freezeTableName: true,
                     timestamps:      false
