@@ -23,17 +23,14 @@
 */
 
 /*  external requirements  */
-import Promise   from "bluebird"
-import co        from "co"
-import sprintf   from "sprintfjs"
-import Sequelize from "sequelize"
+const sprintf   = require("sprintfjs")
+const Sequelize = require("sequelize")
 
 /*  the Microkernel module  */
 export default class Module {
-    constructor (options) {
+    constructor (options = {}) {
         /*  allow database to be configured initially  */
-        this.options = Object.assign({
-        }, options || {})
+        this.options = Object.assign({}, options)
     }
     get module () {
         /*  identify this module  */
@@ -65,89 +62,87 @@ export default class Module {
                 help: "Database Password", helpArg: "PASSWORD" })
             options.push({
                 name: "db-schema-drop", type: "bool", "default": false,
-                help: "Database Schema Dropping & Auto-Recreation." })
+                help: "Database Schema Dropping & Auto-Recreation" })
+            options.push({
+                name: "db-pool-size", type: "number", "default": 10,
+                help: "Database Connection Pool Size" })
         })
     }
-    prepare (kernel) {
-        return co(function * () {
-            /*  configure the database connection  */
-            let opts = kernel.rs("options:options")
-            let options = {
-                pool: {
-                    min:  1,
-                    max:  8,
-                    idle: 10 * 1000
-                },
-                operatorsAliases: false,
-                define: {
-                    freezeTableName: true,
-                    timestamps:      false
-                },
-                logging: (msg) => {
-                    if (!msg.match(/FROM\s+pg_class/))
-                        kernel.sv("log", "sequelize", "debug", "DB: " + msg)
-                }
+    async prepare (kernel) {
+        /*  configure the database connection  */
+        let opts = kernel.rs("options:options")
+        let options = {
+            operatorsAliases: false,
+            define: {
+                freezeTableName: true,
+                timestamps:      false
+            },
+            logging: (msg) => {
+                if (!msg.match(/FROM\s+pg_class/))
+                    kernel.sv("log", "sequelize", "debug", "DB: " + msg)
             }
-            options.dialect = opts.db_dialect
-            if (opts.db_dialect === "sqlite") {
-                opts.db_username = ""
-                opts.db_password = ""
-                options.host     = ""
-                options.port     = ""
-                options.storage  = opts.db_database
-            }
-            else {
-                options.host = opts.db_host
-                options.port = opts.db_port
-            }
-            let db = kernel.rs("db", new Sequelize(opts.db_database, opts.db_username, opts.db_password, options))
+        }
+        options.dialect = opts.db_dialect
+        if (opts.db_dialect === "sqlite") {
+            opts.db_username = ""
+            opts.db_password = ""
+            options.host     = ""
+            options.port     = ""
+            options.storage  = opts.db_database
+        }
+        else {
+            options.host = opts.db_host
+            options.port = opts.db_port
+        }
+        if (opts.db_pool_size > 0)
+            options.pool = { min: 1, max: opts.db_pool_size }
+        let db = kernel.rs("db", new Sequelize(opts.db_database, opts.db_username, opts.db_password, options))
 
-            /*  open connection to database system  */
-            let url
-            if (opts.db_dialect === "sqlite")
-                url = sprintf("%s://%s",
-                    opts.db_dialect, opts.db_database)
-            else
-                url = sprintf("%s://%s@%s:%d/%s",
-                    opts.db_dialect, opts.db_username, opts.db_host, opts.db_port, opts.db_database)
-            yield (new Promise((resolve, reject) => {
-                db.authenticate().then(() => {
-                    kernel.sv("log", "sequelize", "info", sprintf("opened database connection to %s", url))
+        /*  open connection to database system  */
+        let url
+        if (opts.db_dialect === "sqlite")
+            url = sprintf("%s://%s",
+                opts.db_dialect, opts.db_database)
+        else
+            url = sprintf("%s://%s@%s:%d/%s",
+                opts.db_dialect, opts.db_username, opts.db_host, opts.db_port, opts.db_database)
+        await new Promise((resolve, reject) => {
+            db.authenticate().then(() => {
+                kernel.sv("log", "sequelize", "info", sprintf("opened database connection to %s", url))
+                resolve()
+            }).catch((err) => {
+                kernel.sv("fatal", sprintf("failed to establish database connection to %s: %s", url, err))
+                reject(err)
+            })
+        })
+
+        /*  allow other modules to extend schema  */
+        let dm = kernel.rs("dm", {})
+        kernel.hook("sequelize:ddl", "none", db, dm)
+
+        /*  synchronize the defined schema with the RDBMS  */
+        await new Promise((resolve, reject) => {
+            if (kernel.rs("ctx:procmode") !== "worker") {
+                db.sync({ force: opts.db_schema_drop ? true : false }).then(() => {
+                    if (opts.db_schema_drop)
+                        kernel.sv("log", "sequelize", "info", "(re)created database schema from scratch")
+                    else
+                        kernel.sv("log", "sequelize", "info", "synchronized existing database schema")
                     resolve()
-                }).catch((err) => {
-                    kernel.sv("fatal", sprintf("failed to establish database connection to %s: %s", url, err))
-                    reject(err)
+                }, (error) => {
+                    kernel.sv("fatal", "failed to synchronize database schema: " + error)
+                    reject(error)
                 })
-            }))
-
-            /*  allow other modules to extend schema  */
-            let dm = kernel.rs("dm", {})
-            kernel.hook("sequelize:ddl", "none", db, dm)
-
-            /*  synchronize the defined schema with the RDBMS  */
-            yield (new Promise((resolve, reject) => {
-                if (kernel.rs("ctx:procmode") !== "worker") {
-                    db.sync({ force: opts.db_schema_drop ? true : false }).then(() => {
-                        if (opts.db_schema_drop)
-                            kernel.sv("log", "sequelize", "info", "(re)created database schema from scratch")
-                        else
-                            kernel.sv("log", "sequelize", "info", "synchronized existing database schema")
-                        resolve()
-                    }, (error) => {
-                        kernel.sv("fatal", "failed to synchronize database schema: " + error)
-                        reject(error)
-                    })
-                }
-                else
-                    resolve()
-            }))
-        }.bind(this))
+            }
+            else
+                resolve()
+        })
     }
-    release (kernel) {
+    async release (kernel) {
         /*  gracefully close connection on application shutdown  */
         kernel.sv("log", "sequelize", "info", "closing database connection")
         let db = kernel.rs("db")
-        db.close()
+        await db.close()
     }
 }
 
