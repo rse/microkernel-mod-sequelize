@@ -23,7 +23,6 @@
 */
 
 /*  external requirements  */
-const sprintf   = require("sprintfjs")
 const Sequelize = require("sequelize")
 
 /*  the Microkernel module  */
@@ -101,19 +100,14 @@ export default class Module {
         /*  open connection to database system  */
         let url
         if (opts.db_dialect === "sqlite")
-            url = sprintf("%s://%s",
-                opts.db_dialect, opts.db_database)
+            url = `${opts.db_dialect}://${opts.db_database}`
         else
-            url = sprintf("%s://%s@%s:%d/%s",
-                opts.db_dialect, opts.db_username, opts.db_host, opts.db_port, opts.db_database)
-        await new Promise((resolve, reject) => {
-            db.authenticate().then(() => {
-                kernel.sv("log", "sequelize", "info", sprintf("opened database connection to %s", url))
-                resolve()
-            }).catch((err) => {
-                kernel.sv("fatal", sprintf("failed to establish database connection to %s: %s", url, err))
-                reject(err)
-            })
+            url = `${opts.db_dialect}://${opts.db_username}@${opts.db_host}:${opts.db_port}/${opts.db_database}`
+        await db.authenticate().then(() => {
+            kernel.sv("log", "sequelize", "info", `opened database connection to ${url}`)
+        }).catch((err) => {
+            kernel.sv("fatal", `failed to open database connection to ${url}: ${err}`)
+            throw err
         })
 
         /*  allow other modules to extend schema  */
@@ -121,22 +115,17 @@ export default class Module {
         kernel.hook("sequelize:ddl", "none", db, dm)
 
         /*  synchronize the defined schema with the RDBMS  */
-        await new Promise((resolve, reject) => {
-            if (kernel.rs("ctx:procmode") !== "worker") {
-                db.sync({ force: opts.db_schema_drop ? true : false }).then(() => {
-                    if (opts.db_schema_drop)
-                        kernel.sv("log", "sequelize", "info", "(re)created database schema from scratch")
-                    else
-                        kernel.sv("log", "sequelize", "info", "synchronized existing database schema")
-                    resolve()
-                }, (error) => {
-                    kernel.sv("fatal", "failed to synchronize database schema: " + error)
-                    reject(error)
-                })
-            }
-            else
-                resolve()
-        })
+        if (kernel.rs("ctx:procmode") !== "worker") {
+            await db.sync({ force: opts.db_schema_drop ? true : false }).then(() => {
+                if (opts.db_schema_drop)
+                    kernel.sv("log", "sequelize", "info", "(re)created database schema from scratch")
+                else
+                    kernel.sv("log", "sequelize", "info", "synchronized existing database schema")
+            }, (err) => {
+                kernel.sv("fatal", `failed to synchronize database schema: ${err}`)
+                throw err
+            })
+        }
     }
     async release (kernel) {
         /*  gracefully close connection on application shutdown  */
