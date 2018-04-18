@@ -63,22 +63,51 @@ export default class Module {
                 name: "db-schema-drop", type: "bool", "default": false,
                 help: "Database Schema Dropping & Auto-Recreation" })
             options.push({
-                name: "db-pool-size", type: "number", "default": 10,
-                help: "Database Connection Pool Size" })
+                name: "db-pool-min", type: "number", "default": 0,
+                help: "Database Connection Pool: Minimum Size" })
+            options.push({
+                name: "db-pool-max", type: "number", "default": 5,
+                help: "Database Connection Pool: Maximum Size" })
+            options.push({
+                name: "db-pool-idle", type: "number", "default": 10 * 1000,
+                help: "Database Connection Pool: Maximum Connection Idle Time" })
+            options.push({
+                name: "db-pool-acquire", type: "number", "default": 10 * 1000,
+                help: "Database Connection Pool: Maximum Connection Acquire Time" })
+            options.push({
+                name: "db-pool-evict", type: "number", "default": 10 * 1000,
+                help: "Database Connection Pool: Maximum Connection Eviction Time" })
+            options.push({
+                name: "db-query-retry-match", type: "string", "default": "SQLITE_BUSY",
+                help: "Database Query Retry: Matching Query" })
+            options.push({
+                name: "db-query-retry-max", type: "number", "default": 5,
+                help: "Database Query Retry: Maximum Count" })
         })
     }
     async prepare (kernel) {
         /*  configure the database connection  */
         let opts = kernel.rs("options:options")
         let options = {
-            operatorsAliases: false,
+            operatorsAliases:    false,
             define: {
                 freezeTableName: true,
                 timestamps:      false
             },
+            pool: {
+                min:     opts.db_pool_min,
+                max:     opts.db_pool_max,
+                idle:    opts.db_pool_idle,
+                acquire: opts.db_pool_acquire,
+                evict:   opts.db_pool_evict
+            },
+            retry: {
+                max:   opts.db_query_retry_max,
+                match: opts.db_query_retry_match.split(/\s*,\s*/)
+            },
             logging: (msg) => {
                 if (!msg.match(/FROM\s+pg_class/))
-                    kernel.sv("log", "sequelize", "debug", "DB: " + msg)
+                    kernel.sv("log", "sequelize", "debug", `DB: ${msg}`)
             }
         }
         options.dialect = opts.db_dialect
@@ -93,8 +122,6 @@ export default class Module {
             options.host = opts.db_host
             options.port = opts.db_port
         }
-        if (opts.db_pool_size > 0)
-            options.pool = { min: 1, max: opts.db_pool_size }
         let db = kernel.rs("db", new Sequelize(opts.db_database, opts.db_username, opts.db_password, options))
 
         /*  open connection to database system  */
