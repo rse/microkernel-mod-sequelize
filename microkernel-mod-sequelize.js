@@ -26,7 +26,7 @@
 const Sequelize = require("sequelize")
 
 /*  the Microkernel module  */
-export default class Module {
+class Module {
     constructor (options = {}) {
         /*  allow database to be configured initially  */
         this.options = Object.assign({}, options)
@@ -161,4 +161,7 @@ export default class Module {
         await db.close()
     }
 }
+
+/*  export the Microkernel module  */
+module.exports = Module
 
