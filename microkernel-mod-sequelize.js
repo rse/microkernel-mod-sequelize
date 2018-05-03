@@ -36,7 +36,8 @@ class Module {
         return {
             name:  "microkernel-mod-sequelize",
             tag:   "SEQUELIZE",
-            group: "BASE"
+            group: "BASE",
+            after: [ "CTX", "OPTIONS" ]
         }
     }
     latch (kernel) {
