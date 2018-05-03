@@ -88,6 +88,11 @@ class Module {
     async prepare (kernel) {
         /*  configure the database connection  */
         let opts = kernel.rs("options:options")
+
+        /*  we operate only in non daemonized mode  */
+        if (opts.daemon || opts.daemon_kill)
+            return
+
         let options = {
             operatorsAliases:    false,
             define: {
@@ -155,6 +160,10 @@ class Module {
         }
     }
     async release (kernel) {
+        /*  we operate only in non daemonized mode  */
+        if (kernel.rs("options:options").daemon || kernel.rs("options:options").daemon_kill)
+            return
+
         /*  gracefully close connection on application shutdown  */
         kernel.sv("log", "sequelize", "info", "closing database connection")
         let db = kernel.rs("db")
