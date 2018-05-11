@@ -18,7 +18,7 @@
     "homepage": "https://github.com/rse/microkernel-mod-sequelize",
     "bugs":     "https://github.com/rse/microkernel-mod-sequelize/issues",
     "dependencies": {
-        "sequelize":                "4.37.6"
+        "sequelize":                "4.37.7"
     },
     "devDependencies": {
         "babel-eslint":             "8.2.3",
