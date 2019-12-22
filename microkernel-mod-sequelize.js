@@ -88,13 +88,13 @@ class Module {
     }
     async prepare (kernel) {
         /*  configure the database connection  */
-        let opts = kernel.rs("options:options")
+        const opts = kernel.rs("options:options")
 
         /*  we operate only in non daemonized mode  */
         if (opts.daemon || opts.daemon_kill)
             return
 
-        let options = {
+        const options = {
             define: {
                 freezeTableName: true,
                 timestamps:      false
@@ -127,7 +127,7 @@ class Module {
             options.host = opts.db_host
             options.port = opts.db_port
         }
-        let db = kernel.rs("db", new Sequelize(opts.db_database, opts.db_username, opts.db_password, options))
+        const db = kernel.rs("db", new Sequelize(opts.db_database, opts.db_username, opts.db_password, options))
 
         /*  open connection to database system  */
         let url
@@ -143,7 +143,7 @@ class Module {
         })
 
         /*  allow other modules to extend schema  */
-        let dm = kernel.rs("dm", {})
+        const dm = kernel.rs("dm", {})
         kernel.hook("sequelize:ddl", "none", db, dm)
 
         /*  synchronize the defined schema with the RDBMS  */
@@ -166,7 +166,7 @@ class Module {
 
         /*  gracefully close connection on application shutdown  */
         kernel.sv("log", "sequelize", "info", "closing database connection")
-        let db = kernel.rs("db")
+        const db = kernel.rs("db")
         await db.close()
     }
 }
