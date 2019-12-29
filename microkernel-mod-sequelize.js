@@ -87,13 +87,14 @@ class Module {
         })
     }
     async prepare (kernel) {
-        /*  configure the database connection  */
+        /*  we operate only in non-daemonized mode
+            (microkernel-mod-daemon will remove option "--daemon" in
+            child processes and then we want to operate only)  */
         const opts = kernel.rs("options:options")
-
-        /*  we operate only in non daemonized mode  */
         if (opts.daemon || opts.daemon_kill)
             return
 
+        /*  configure the database connection  */
         const options = {
             define: {
                 freezeTableName: true,
@@ -160,8 +161,11 @@ class Module {
         }
     }
     async release (kernel) {
-        /*  we operate only in non daemonized mode  */
-        if (kernel.rs("options:options").daemon || kernel.rs("options:options").daemon_kill)
+        /*  we operate only in non-daemonized mode
+            (microkernel-mod-daemon will remove option "--daemon" in
+            child processes and then we want to operate only)  */
+        const opts = kernel.rs("options:options")
+        if (opts.daemon || opts.daemon_kill)
             return
 
         /*  gracefully close connection on application shutdown  */
